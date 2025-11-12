@@ -1,0 +1,72 @@
+# ============================
+# 📦 Node / Dependencies
+# ============================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# ============================
+# ⚙️ Next.js Build Outputs
+# ============================
+.next/
+out/
+build/
+.vercel/
+
+# ============================
+# 🧩 Environment Files
+# ============================
+# Ignore all env files by default
+.env
+.env.*
+# Allow these to stay in git (for deployment reference)
+!.env.example
+!.env.local
+!.env.production
+!.env.development
+.env.local
+# ============================
+# 🧱 Project Configuration
+# ============================
+# Ignore local lockfiles — prefer team-wide consistency
+package-lock.json
+package,json
+tsconfig.json
+yarn.lock
+pnpm-lock.yaml
+postcss.config.mjss
+# Keep TypeScript config tracked
+!tsconfig.json
+
+# ============================
+# 🖼️ Public Assets
+# ============================
+# Keep your public assets (images, icons, etc.)
+!public/
+public/uploads/
+public/temp/
+public/cache/
+
+# ============================
+# 🧪 IDE / System Files
+# ============================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ============================
+# ✅ Explicit Inclusions
+# ============================
+# Always keep these tracked
+!.gitignore
+!package.json
+!next.config.mjs
+!components.json
+components.json
+next-env.d.ts
+!.prettierrc
+tsconfig.json
