@@ -1,6 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
+import React from "react"
 
 interface GameNode {
   id: number
@@ -16,238 +17,328 @@ interface GameTreePathProps {
 }
 
 export default function GameTreePath({ games }: GameTreePathProps) {
+  // Layout positions for wide zig-zag
+  const positions = [
+    "center",    // 1
+    "far-left",  // 2
+    "far-right", // 3
+    "center",    // 4
+    "far-left",  // 5
+    "far-right", // 6
+  ]
+
+  // Helper: convert layout into an x offset for manual decorations
+  const xOffset = (pos: string) => {
+    if (pos === "far-left") return 120
+    if (pos === "far-right") return -120
+    return 0
+  }
+
+  // We'll build an array of path segments (d strings) to map motion paths / particles.
+  // These correlate roughly with node positions (1->2, 2->3, etc.)
+  // Coordinates chosen to match zig-zag layout for a tall map.
+  const pathSegments = [
+    // 1 -> 2 (center down to far-left)
+    "M450 80 C450 180 330 220 330 320",
+    // 2 -> 3 (far-left curve to far-right)
+    "M330 360 C330 420 600 420 600 520",
+    // 3 -> 4 (far-right down to center)
+    "M600 560 C600 660 450 700 450 800",
+    // 4 -> 5 (center down to far-left)
+    "M450 840 C450 940 330 980 330 1080",
+    // 5 -> 6 (far-left curve to far-right)
+    "M330 1120 C330 1180 600 1180 600 1280",
+    // 6 -> end (far-right down)
+    "M600 1320 C600 1400 450 1460 450 1520",
+  ]
+
   return (
-    <div className="relative w-full min-h-[1400px] flex flex-col items-center justify-center py-12 px-6">
-      {/* Enhanced SVG Path with animations */}
+    <div className="relative w-full min-h-[1600px] flex flex-col items-center justify-center py-8 px-6 overflow-hidden">
+      {/* PARALLAX BACKGROUND DECORATIONS */}
+      <div className="absolute inset-0 pointer-events-none -z-10">
+        {/* Soft ambient gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-indigo-50 via-white to-indigo-100 opacity-90" />
+
+        {/* Floating clouds / bubbles (parallax) */}
+        <motion.div
+          className="absolute top-8 left-8 text-5xl opacity-30"
+          animate={{ x: [0, 40, 0] }}
+          transition={{ duration: 12, repeat: Infinity }}
+        >
+          ☁️
+        </motion.div>
+        <motion.div
+          className="absolute top-32 right-12 text-5xl opacity-20"
+          animate={{ x: [0, -60, 0], y: [0, 10, 0] }}
+          transition={{ duration: 10, repeat: Infinity }}
+        >
+          🫧
+        </motion.div>
+
+        {/* Parallax floating critters */}
+        <motion.div
+          className="absolute -bottom-10 left-12 text-4xl opacity-30"
+          animate={{ x: [0, 30, 0], y: [0, -10, 0] }}
+          transition={{ duration: 14, repeat: Infinity }}
+        >
+          🐛
+        </motion.div>
+        <motion.div
+          className="absolute -bottom-6 right-20 text-4xl opacity-25"
+          animate={{ x: [0, -40, 0], y: [0, -8, 0] }}
+          transition={{ duration: 16, repeat: Infinity }}
+        >
+          🐝
+        </motion.div>
+      </div>
+
+      {/* SVG Adventure Path */}
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{
-          filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.15))",
-          zIndex: 0,
-        }}
-        viewBox="0 0 600 1600"
-        preserveAspectRatio="none"
+        viewBox="0 0 900 1600"
+        preserveAspectRatio="xMidYMid slice"
+        style={{ zIndex: 0 }}
       >
         <defs>
-          <linearGradient id="pathGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="rgba(74, 222, 128, 0.6)" />
-            <stop offset="50%" stopColor="rgba(59, 130, 246, 0.5)" />
-            <stop offset="100%" stopColor="rgba(168, 85, 247, 0.4)" />
+          <linearGradient id="routeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#4ade80" stopOpacity="0.9" />
+            <stop offset="50%" stopColor="#60a5fa" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="#a78bfa" stopOpacity="0.75" />
           </linearGradient>
 
-          {/* Animated gradient */}
-          <linearGradient id="animatedGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="rgba(255, 237, 213, 0.8)">
-              <animate attributeName="stop-color" values="rgba(255,237,213,0.8); rgba(252,211,77,0.8); rgba(255,237,213,0.8)" dur="3s" repeatCount="indefinite" />
-            </stop>
-            <stop offset="100%" stopColor="rgba(254, 215, 170, 0.6)">
-              <animate attributeName="stop-color" values="rgba(254,215,170,0.6); rgba(251,191,36,0.6); rgba(254,215,170,0.6)" dur="3s" repeatCount="indefinite" />
-            </stop>
-          </linearGradient>
+          <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fff7ed" stopOpacity="1" />
+            <stop offset="100%" stopColor="#fff7ed" stopOpacity="0" />
+          </radialGradient>
 
-          {/* Sparkling particles pattern */}
-          <pattern id="sparkles" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-            <circle cx="10" cy="10" r="2" fill="rgba(255, 255, 255, 0.6)">
-              <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="30" cy="30" r="1.5" fill="rgba(250, 204, 21, 0.5)">
-              <animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" repeatCount="indefinite" begin="0.5s" />
-            </circle>
-          </pattern>
-
-          {/* Glow filter */}
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+          <filter id="softBlur">
+            <feGaussianBlur stdDeviation="8" result="blur" />
             <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+
+          {/* Sparkle pattern for overlay */}
+          <pattern id="tinySpark" width="40" height="40" patternUnits="userSpaceOnUse">
+            <circle cx="10" cy="10" r="1.2" fill="rgba(255,255,255,0.7)">
+              <animate attributeName="opacity" values="0.2;1;0.2" dur="2.5s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="28" cy="28" r="0.9" fill="rgba(250,204,21,0.5)">
+              <animate attributeName="opacity" values="0.1;0.8;0.1" dur="3s" repeatCount="indefinite" begin="0.5s" />
+            </circle>
+          </pattern>
         </defs>
 
-        {/* Main path with enhanced styling */}
-        <g filter="url(#glow)">
-          {/* Node 1 to 2 */}
-          <path
-            d="M 300 100 L 300 200"
-            stroke="url(#pathGradient)"
-            strokeWidth="60"
-            fill="none"
-            strokeLinecap="round"
-            opacity="0.8"
-          />
+        {/* Big soft ambient glow behind entire path */}
+        <ellipse cx="450" cy="800" rx="420" ry="760" fill="url(#glowGrad)" opacity="0.25" filter="url(#softBlur)" />
 
-          {/* Node 2 to 3 - curve left */}
-          <path
-            d="M 300 280 Q 250 330 180 380"
-            stroke="url(#pathGradient)"
-            strokeWidth="60"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.8"
-          />
-
-          {/* Node 3 to 4 - curve back right */}
-          <path
-            d="M 180 460 Q 230 510 300 560"
-            stroke="url(#pathGradient)"
-            strokeWidth="60"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.8"
-          />
-
-          {/* Node 4 to 5 - curve right */}
-          <path
-            d="M 300 640 Q 380 690 420 760"
-            stroke="url(#pathGradient)"
-            strokeWidth="60"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.8"
-          />
-
-          {/* Node 5 to 6 - curve back left */}
-          <path
-            d="M 420 840 Q 360 890 300 940"
-            stroke="url(#pathGradient)"
-            strokeWidth="60"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.8"
-          />
-        </g>
-
-        {/* Overlay sparkle pattern */}
+        {/* Draw the major route in one continuous path (stroke dash animation) */}
         <path
-          d="M 300 100 L 300 200 Q 250 330 180 380 Q 230 510 300 560 Q 380 690 420 760 Q 360 890 300 940"
-          stroke="url(#sparkles)"
-          strokeWidth="60"
+          id="mainRoute"
+          d={`
+            M450 80
+            C450 180 330 220 330 320
+            C330 380 600 380 600 480
+            C600 540 450 580 450 680
+            C450 760 330 800 330 900
+            C330 960 600 960 600 1060
+            C600 1120 450 1160 450 1240
+          `}
+          fill="none"
+          stroke="url(#routeGradient)"
+          strokeWidth="44"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.95"
+        />
+        {/* Animated stroke overlay to create motion along the path */}
+        <path
+          d={`
+            M450 80
+            C450 180 330 220 330 320
+            C330 380 600 380 600 480
+            C600 540 450 580 450 680
+            C450 760 330 800 330 900
+            C330 960 600 960 600 1060
+            C600 1120 450 1160 450 1240
+          `}
+          fill="none"
+          stroke="#fff6e0"
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="30 20"
+          strokeDashoffset="0"
+        >
+          <animate attributeName="stroke-dashoffset" from="0" to="-500" dur="8s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.8;0.4;0.8" dur="5s" repeatCount="indefinite" />
+        </path>
+
+        {/* Decorative sparkle overlay */}
+        <path
+          d={`
+            M450 80
+            C450 180 330 220 330 320
+            C330 380 600 380 600 480
+            C600 540 450 580 450 680
+            C450 760 330 800 330 900
+            C330 960 600 960 600 1060
+            C600 1120 450 1160 450 1240
+          `}
+          stroke="url(#tinySpark)"
+          strokeWidth="16"
           fill="none"
           strokeLinecap="round"
-          opacity="0.6"
+          opacity="0.35"
         />
 
-        {/* Animated traveling light */}
-        <circle r="8" fill="rgba(255, 237, 213, 0.9)" filter="url(#glow)">
-          <animateMotion
-            dur="8s"
-            repeatCount="indefinite"
-            path="M 300 100 L 300 200 Q 250 330 180 380 Q 230 510 300 560 Q 380 690 420 760 Q 360 890 300 940"
+        {/* Traveling particles that follow the path (multiple lights) */}
+        <g>
+          <circle r="8" fill="#fff8e1" opacity="0.95" filter="url(#softBlur)">
+            <animateMotion dur="9s" repeatCount="indefinite">
+              <mpath href="#mainRoute" />
+            </animateMotion>
+          </circle>
+
+          <circle r="6" fill="#ffedd5" opacity="0.75" filter="url(#softBlur)">
+            <animateMotion dur="12s" repeatCount="indefinite" begin="1.5s">
+              <mpath href="#mainRoute" />
+            </animateMotion>
+          </circle>
+
+          <circle r="5" fill="#fee2b3" opacity="0.6" filter="url(#softBlur)">
+            <animateMotion dur="10.5s" repeatCount="indefinite" begin="0.7s">
+              <mpath href="#mainRoute" />
+            </animateMotion>
+          </circle>
+        </g>
+
+        {/* Connectors between node anchor points - small arcs */}
+        {pathSegments.map((d, idx) => (
+          <path
+            key={`seg-${idx}`}
+            d={d}
+            fill="none"
+            stroke="rgba(255,255,255,0.06)"
+            strokeWidth={10}
+            strokeLinecap="round"
+            opacity={0.6}
           />
-        </circle>
+        ))}
+
+        {/* Small drifting spark particles emitted at specific anchor points (nodes) */}
+        {[80, 320, 520, 680, 900, 1060].map((cy, i) => (
+          <g key={`emit-${i}`}>
+            <circle cx={i % 2 === 0 ? 450 : i % 3 === 0 ? 600 : 330} cy={cy} r="4" fill="#fff7ed" opacity="0.85">
+              <animate attributeName="r" values="3;6;3" dur={`${3 + (i % 3)}s`} repeatCount="indefinite" />
+            </circle>
+            {/* a few drifting sparkles around the node */}
+            <circle cx={i % 2 === 0 ? 420 : 630} cy={cy - 20} r="2" fill="#fef3c7" opacity="0.7">
+              <animate attributeName="cy" values={`${cy - 20};${cy - 60};${cy - 20}`} dur={`${2 + (i % 2)}s`} repeatCount="indefinite" />
+            </circle>
+            <circle cx={i % 2 === 0 ? 480 : 570} cy={cy + 10} r="2" fill="#fff3b0" opacity="0.6">
+              <animate attributeName="cy" values={`${cy + 10};${cy + 40};${cy + 10}`} dur={`${2.2 + (i % 3)}s`} repeatCount="indefinite" />
+            </circle>
+          </g>
+        ))}
       </svg>
 
-      {/* Game nodes with enhanced animations */}
-      <div className="relative z-10 flex flex-col gap-24 items-center w-full">
+      {/* Nodes area: large vertical spacing with wide zig-zag positions */}
+      <div className="relative z-10 flex flex-col gap-36 items-center w-full max-w-[900px]">
         {games.map((game, index) => {
-          const positions = [
-            "center", // Node 1
-            "center", // Node 2
-            "left",   // Node 3
-            "center", // Node 4
-            "right",  // Node 5
-            "center", // Node 6
-          ]
-          const position = positions[index] || "center"
+          const layout = positions[index] || "center"
+          const pushClass =
+            layout === "far-left"
+              ? "justify-start pl-[160px] xl:pl-[220px]"
+              : layout === "far-right"
+              ? "justify-end pr-[160px] xl:pr-[220px]"
+              : "justify-center"
+
+          // compute node anchor for minor linking (for aria/polish)
+          const anchorX = layout === "far-left" ? 120 : layout === "far-right" ? 780 : 450
 
           return (
             <motion.div
               key={game.id}
-              initial={{ scale: 0, opacity: 0, y: 50 }}
+              initial={{ scale: 0, opacity: 0, y: 60 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{
-                delay: index * 0.2,
-                duration: 0.8,
+                delay: index * 0.18,
+                duration: 0.9,
                 type: "spring",
-                stiffness: 120,
+                stiffness: 110,
               }}
-              className={`relative flex flex-col items-center w-full ${
-                position === "left"
-                  ? "justify-start pl-8"
-                  : position === "right"
-                    ? "justify-end pr-8"
-                    : "justify-center"
-              }`}
+              className={`relative flex flex-col items-center w-full ${pushClass}`}
+              aria-label={`Node ${game.id} anchorX ${anchorX}`}
             >
-              {/* Enhanced node container */}
+              {/* Material-style floating node container */}
               <motion.button
-                whileHover={!game.isLocked ? { 
-                  scale: 1.2, 
-                  y: -15,
-                  rotate: [0, -5, 5, -5, 0],
-                } : {
-                  x: [-3, 3, -3, 3, 0],
-                }}
-                whileTap={!game.isLocked ? { scale: 0.9 } : {}}
+                whileHover={
+                  !game.isLocked
+                    ? {
+                        scale: 1.18,
+                        y: -12,
+                        rotate: [0, -4, 4, -4, 0],
+                        boxShadow: "0px 30px 60px rgba(0,0,0,0.18)",
+                      }
+                    : { x: [-3, 3, -3, 3, 0] }
+                }
+                whileTap={!game.isLocked ? { scale: 0.94 } : {}}
                 onClick={game.onClick}
                 disabled={game.isLocked}
-                className={`relative w-36 h-36 rounded-full flex items-center justify-center font-black text-5xl transition-all shadow-2xl shrink-0 ${
-                  game.isLocked
-                    ? "bg-gradient-to-br from-gray-400 to-gray-600 cursor-not-allowed opacity-60 ring-4 ring-gray-400"
-                    : game.isCompleted
-                      ? "bg-gradient-to-br from-yellow-300 via-amber-400 to-orange-500 text-white ring-8 ring-yellow-300 shadow-yellow-300 shadow-2xl"
-                      : "bg-gradient-to-br from-blue-400 via-cyan-400 to-teal-400 text-white hover:shadow-3xl ring-8 ring-blue-300 hover:ring-cyan-400"
-                }`}
+                className={`relative w-36 h-36 rounded-full flex items-center justify-center font-black text-5xl transition-all shadow-2xl shrink-0
+                    ${
+                      game.isLocked
+                        ? "bg-gradient-to-br from-gray-400 to-gray-600 cursor-not-allowed opacity-70 ring-4 ring-gray-400"
+                        : game.isCompleted
+                        ? "bg-gradient-to-br from-yellow-300 via-amber-400 to-orange-500 text-white ring-8 ring-yellow-300 shadow-yellow-300"
+                        : "bg-gradient-to-br from-blue-400 via-cyan-400 to-teal-400 text-white hover:shadow-3xl ring-8 ring-blue-300 hover:ring-cyan-400"
+                    }`}
               >
-                {/* Rotating border for active games */}
+                {/* rotating dashed ring */}
                 {!game.isLocked && !game.isCompleted && (
                   <motion.div
-                    className="absolute inset-0 rounded-full border-4 border-dashed border-white/50"
+                    className="absolute inset-0 rounded-full border-4 border-dashed border-white/40"
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
                   />
                 )}
 
-                {/* Multiple glow layers for completed games */}
+                {/* completed multi-layer glow */}
                 {game.isCompleted && (
                   <>
                     <motion.div
-                      animate={{
-                        scale: [1, 1.4, 1],
-                        opacity: [0.6, 0.2, 0.6],
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
+                      animate={{ scale: [1, 1.45, 1], opacity: [0.6, 0.12, 0.6] }}
+                      transition={{ duration: 2.2, repeat: Infinity }}
                       className="absolute inset-0 rounded-full bg-yellow-400"
                     />
                     <motion.div
-                      animate={{
-                        scale: [1, 1.6, 1],
-                        opacity: [0.4, 0, 0.4],
-                      }}
-                      transition={{ duration: 2.5, repeat: Infinity }}
+                      animate={{ scale: [1, 1.7, 1], opacity: [0.35, 0.0, 0.35] }}
+                      transition={{ duration: 3, repeat: Infinity }}
                       className="absolute inset-0 rounded-full bg-orange-300"
                     />
-                    
-                    {/* Orbiting stars */}
                     {[0, 120, 240].map((angle, i) => (
                       <motion.div
                         key={i}
                         className="absolute text-2xl"
-                        style={{
-                          left: "50%",
-                          top: "50%",
-                        }}
+                        style={{ left: "50%", top: "50%" }}
                         animate={{
                           x: [
-                            Math.cos((angle + 0) * Math.PI / 180) * 60,
-                            Math.cos((angle + 360) * Math.PI / 180) * 60,
+                            Math.cos((angle * Math.PI) / 180) * 62,
+                            Math.cos(((angle + 360) * Math.PI) / 180) * 62,
                           ],
                           y: [
-                            Math.sin((angle + 0) * Math.PI / 180) * 60,
-                            Math.sin((angle + 360) * Math.PI / 180) * 60,
+                            Math.sin((angle * Math.PI) / 180) * 62,
+                            Math.sin(((angle + 360) * Math.PI) / 180) * 62,
                           ],
                           rotate: [0, 360],
                         }}
                         transition={{
-                          duration: 4,
+                          duration: 4.2,
                           repeat: Infinity,
                           ease: "linear",
-                          delay: i * 0.4,
+                          delay: i * 0.35,
                         }}
                       >
                         ⭐
@@ -256,37 +347,29 @@ export default function GameTreePath({ games }: GameTreePathProps) {
                   </>
                 )}
 
-                {/* Pulse effect for active games */}
+                {/* active pulse + sparkles */}
                 {!game.isLocked && !game.isCompleted && (
                   <>
                     <motion.div
-                      animate={{
-                        scale: [1, 1.3, 1],
-                        opacity: [0.5, 0, 0.5],
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="absolute inset-0 rounded-full bg-blue-400"
+                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0, 0.4] }}
+                      transition={{ duration: 2.2, repeat: Infinity }}
+                      className="absolute inset-0 rounded-full bg-blue-400/60"
                     />
-                    
-                    {/* Floating sparkles */}
-                    {[...Array(3)].map((_, i) => (
+                    {[...Array(4)].map((_, i) => (
                       <motion.div
                         key={i}
                         className="absolute text-xl"
-                        style={{
-                          left: "50%",
-                          top: "50%",
-                        }}
+                        style={{ left: "50%", top: "50%" }}
                         animate={{
-                          y: [-80, -120],
-                          x: [(i - 1) * 20, (i - 1) * 30],
+                          y: [-70, -120 - i * 8],
+                          x: [(i - 1.5) * 18, (i - 1.5) * 30],
                           opacity: [0, 1, 0],
                           scale: [0, 1, 0],
                         }}
                         transition={{
-                          duration: 2,
+                          duration: 2.2,
                           repeat: Infinity,
-                          delay: i * 0.4,
+                          delay: i * 0.3,
                         }}
                       >
                         ✨
@@ -295,100 +378,59 @@ export default function GameTreePath({ games }: GameTreePathProps) {
                   </>
                 )}
 
-                {/* Icon display */}
+                {/* icon */}
                 <motion.span
                   className="relative z-10"
-                  animate={game.isCompleted ? {
-                    rotate: [0, 360],
-                    scale: [1, 1.2, 1],
-                  } : !game.isLocked ? {
-                    y: [0, -5, 0],
-                  } : {}}
-                  transition={{
-                    duration: game.isCompleted ? 3 : 2,
-                    repeat: Infinity,
-                  }}
+                  animate={
+                    game.isCompleted
+                      ? { rotate: [0, 360], scale: [1, 1.18, 1] }
+                      : !game.isLocked
+                      ? { y: [0, -6, 0] }
+                      : {}
+                  }
+                  transition={{ duration: 3, repeat: Infinity }}
                 >
                   {game.isLocked ? "🔒" : game.isCompleted ? "🏆" : game.icon}
                 </motion.span>
 
-                {/* Status badge */}
+                {/* status badge */}
                 {!game.isLocked && (
                   <motion.div
                     className={`absolute -top-4 -right-4 px-4 py-2 rounded-full text-xs font-black text-white shadow-lg ${
-                      game.isCompleted
-                        ? "bg-gradient-to-r from-green-500 to-emerald-600"
-                        : "bg-gradient-to-r from-blue-500 to-purple-600"
+                      game.isCompleted ? "bg-gradient-to-r from-green-500 to-emerald-600" : "bg-gradient-to-r from-blue-500 to-purple-600"
                     }`}
                     initial={{ scale: 0, rotate: -180 }}
-                    animate={{ 
-                      scale: 1, 
-                      rotate: 0,
-                      y: game.isCompleted ? [0, -5, 0] : 0,
-                    }}
-                    transition={{
-                      type: "spring",
-                      y: { duration: 1, repeat: Infinity }
-                    }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 200 }}
                   >
                     {game.isCompleted ? "✓ DONE" : "▶ PLAY"}
                   </motion.div>
                 )}
               </motion.button>
 
-              {/* Enhanced info section */}
+              {/* title + status */}
               <div className="flex flex-col gap-2 mt-6 text-center">
-                <motion.p 
-                  className="font-black text-xl text-gray-900 drop-shadow-lg bg-white/80 backdrop-blur px-4 py-2 rounded-full"
-                  whileHover={{ scale: 1.05 }}
-                >
+                <motion.p className="font-black text-xl text-gray-900 drop-shadow-lg bg-white/80 backdrop-blur px-4 py-2 rounded-full" whileHover={{ scale: 1.03 }}>
                   {game.title}
                 </motion.p>
 
-                {/* Enhanced status indicators */}
                 {game.isLocked ? (
-                  <motion.div
-                    animate={{ x: [-3, 3, -3] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="flex items-center justify-center gap-2 bg-red-100 px-4 py-2 rounded-full"
-                  >
+                  <motion.div animate={{ x: [-3, 3, -3] }} transition={{ duration: 2, repeat: Infinity }} className="flex items-center justify-center gap-2 bg-red-100 px-4 py-2 rounded-full">
                     <span className="text-red-600 text-sm font-black">🔒 Locked</span>
                   </motion.div>
                 ) : game.isCompleted ? (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                    className="flex items-center justify-center gap-2 bg-green-100 px-4 py-2 rounded-full"
-                  >
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300 }} className="flex items-center justify-center gap-2 bg-green-100 px-4 py-2 rounded-full">
                     <span className="text-green-700 text-sm font-black">✓ Mastered!</span>
                     <div className="flex gap-1">
                       {[1, 2, 3].map((star) => (
-                        <motion.span
-                          key={star}
-                          initial={{ scale: 0, rotate: 180, y: -10 }}
-                          animate={{ scale: 1, rotate: 0, y: 0 }}
-                          transition={{
-                            delay: star * 0.15,
-                            type: "spring",
-                            stiffness: 250,
-                          }}
-                          className="text-lg"
-                        >
+                        <motion.span key={star} initial={{ scale: 0, rotate: 180, y: -10 }} animate={{ scale: 1, rotate: 0, y: 0 }} transition={{ delay: star * 0.12, type: "spring", stiffness: 220 }} className="text-lg">
                           ⭐
                         </motion.span>
                       ))}
                     </div>
                   </motion.div>
                 ) : (
-                  <motion.div
-                    animate={{ 
-                      y: [-2, 2, -2],
-                      scale: [1, 1.05, 1],
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="flex items-center justify-center gap-2 bg-blue-100 px-4 py-2 rounded-full"
-                  >
+                  <motion.div animate={{ y: [-2, 2, -2], scale: [1, 1.04, 1] }} transition={{ duration: 2, repeat: Infinity }} className="flex items-center justify-center gap-2 bg-blue-100 px-4 py-2 rounded-full">
                     <span className="text-blue-700 text-sm font-black">▶ Ready to Play!</span>
                   </motion.div>
                 )}

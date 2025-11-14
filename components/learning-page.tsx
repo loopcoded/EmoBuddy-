@@ -32,7 +32,7 @@ export default function LearningPage({ childID, profile }: LearningPageProps) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true })
         if (videoRef.current) videoRef.current.srcObject = stream
-      } catch (err) {
+      } catch {
         console.warn("Camera permission denied")
       }
     }
@@ -46,44 +46,45 @@ export default function LearningPage({ childID, profile }: LearningPageProps) {
     }
   }, [])
 
-  // Placeholder emotion detector (you will replace this with your real model)
+  // DISABLED: auto emotions (so it won't switch to calming mode automatically)
+  // You can re-enable when your model is ready
+  /*
   useEffect(() => {
     const interval = setInterval(() => {
-      // TODO: Replace this with your model output
-      // setEmotion(modelPrediction)
-
-      // SIMULATION FOR NOW
       const random = Math.random()
       if (random < 0.1) setEmotion("angry")
       else if (random < 0.2) setEmotion("sad")
       else setEmotion("happy")
     }, 5000)
-
     return () => clearInterval(interval)
   }, [])
+  */
 
-  // Trigger calming mode
+  // DISABLED auto calming mode
+  /*
   useEffect(() => {
     if (emotion === "sad" || emotion === "angry") {
       setIsCalmingMode(true)
     }
   }, [emotion])
+  */
+
+  // Only switch to calming games when YOU click the button
+  const handleCalmingClick = () => {
+    setIsCalmingMode(true)
+  }
 
   const handleCalmingComplete = () => {
-    // close calming and restore last module position if any
     setIsCalmingMode(false)
     if (lastModuleID !== null) {
-      // we use hash navigation to let the level journeys scroll / jump to the module
       window.location.hash = `#module-${lastModuleID}`
     }
   }
 
-  // If in calming mode: show the full calming journey system
   if (isCalmingMode) {
     return <CalmingGameSequence onComplete={handleCalmingComplete} />
   }
 
-  // Normal learning view — render the appropriate Level component and pass the onModuleChange callback
   let content = null
   switch (profile.autismSupportLevel) {
     case 1:
@@ -123,19 +124,33 @@ export default function LearningPage({ childID, profile }: LearningPageProps) {
 
   return (
     <>
-      {/* DEBUG EMOTION TESTING PANEL */}
-      <div className="fixed top-4 right-4 bg-white shadow-md rounded-xl p-4 z-50">
-        <p className="font-bold mb-2">Emotion Debug</p>
-        <button onClick={() => setEmotion("happy")} className="px-3 py-1 bg-green-300 rounded-md mr-2">
-          😊 Happy
-        </button>
-        <button onClick={() => setEmotion("sad")} className="px-3 py-1 bg-blue-300 rounded-md mr-2">
-          😢 Sad
-        </button>
-        <button onClick={() => setEmotion("angry")} className="px-3 py-1 bg-red-300 rounded-md">
-          😡 Angry
-        </button>
-      </div>
+      {/* Manual trigger panel */}
+      <div className="fixed bottom-4 right-4 bg-white shadow-md rounded-xl p-4 z-50 flex flex-col gap-3 w-64">
+  
+    <p className="font-bold">Emotion Debug</p>
+  
+    <div className="flex gap-2">
+      <button onClick={() => setEmotion("happy")} className="px-3 py-1 bg-green-300 rounded-md flex-1">
+        😊 Happy
+      </button>
+  
+      <button onClick={() => setEmotion("sad")} className="px-3 py-1 bg-blue-300 rounded-md flex-1">
+        😢 Sad
+      </button>
+  
+      <button onClick={() => setEmotion("angry")} className="px-3 py-1 bg-red-300 rounded-md flex-1">
+        😡 Angry
+      </button>
+    </div>
+  
+    <button
+      onClick={handleCalmingClick}
+      className="px-3 py-2 bg-purple-300 rounded-md w-full text-center"
+    >
+      Start Calming Games
+    </button>
+  
+  </div>
 
       {content}
     </>

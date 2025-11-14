@@ -56,7 +56,7 @@ export default function Level1Journey(props: Level1JourneyProps) {
   const [childProfile, setChildProfile] = useState<{ avatarConfig: Record<string, unknown> } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Calculate total progress
+  // Calculate % completed
   useEffect(() => {
     const completed = [
       progress.game1Completed,
@@ -66,101 +66,95 @@ export default function Level1Journey(props: Level1JourneyProps) {
       progress.game5Completed,
       progress.game6Completed,
     ].filter(Boolean).length
+
     setTotalProgress((completed / 6) * 100)
   }, [progress])
 
+  // Load progress
   useEffect(() => {
-    if (childID) {
-      setIsLoading(true)
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/get-state/${childID}/${LEVEL_NUMBER}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.state) {
-            const parsed = data.state as GameProgress
-            setProgress(parsed)
-            const last = parsed.lastPlayedGame
-            if (last && !(parsed as any)[`game${last}Completed`]) {
-              setCurrentGame(last as 1 | 2 | 3 | 4 | 5 | 6)
-            }
-          } else {
-            setProgress(DEFAULT_PROGRESS)
+    if (!childID) return
+    setIsLoading(true)
+
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/get-state/${childID}/${LEVEL_NUMBER}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.state) {
+          const parsed = data.state as GameProgress
+          setProgress(parsed)
+
+          if (parsed.lastPlayedGame && !(parsed as any)[`game${parsed.lastPlayedGame}Completed`]) {
+            setCurrentGame(parsed.lastPlayedGame as 1 | 2 | 3 | 4 | 5 | 6)
           }
-        })
-        .catch((err) => {
-          console.error("Failed to fetch progress:", err)
+        } else {
           setProgress(DEFAULT_PROGRESS)
-        })
-        .finally(() => setIsLoading(false))
-    }
+        }
+      })
+      .catch(() => setProgress(DEFAULT_PROGRESS))
+      .finally(() => setIsLoading(false))
   }, [childID])
-  
-  // Auto-resume last game after calming
-  // Auto-resume last game after calming (paste into level1/2/3 journey components)
-useEffect(() => {
-  if (typeof window === "undefined") return;
 
-  const hash = window.location.hash;
-  if (!hash || !hash.startsWith("#module-")) return;
+  // Auto-resume after calming game
+  useEffect(() => {
+    if (typeof window === "undefined") return
 
-  const moduleIdRaw = hash.replace("#module-", "");
-  const moduleId = Number(moduleIdRaw);
+    const hash = window.location.hash
+    if (hash && hash.startsWith("#module-")) {
+      const id = Number(hash.replace("#module-", ""))
 
-  // Validate moduleId is an integer between 1 and 6
-  if (!Number.isInteger(moduleId) || moduleId < 1 || moduleId > 6) {
-    // invalid or out-of-range id — ignore
-    return;
-  }
+      if (Number.isInteger(id) && id >= 1 && id <= 6) {
+        setCurrentGame(id as 1 | 2 | 3 | 4 | 5 | 6)
+      }
+      window.location.hash = ""
+    }
+  }, [])
 
-  // TypeScript: cast to the union type that setCurrentGame expects
-  setCurrentGame(moduleId as 1 | 2 | 3 | 4 | 5 | 6);
-
-  // Clear the hash so it doesn't trigger again on refresh/navigation
-  window.location.hash = "";
-}, []);
-
-  
+  // Save progress
   useEffect(() => {
     if (!childID || isLoading) return
-    const isNotDefault = JSON.stringify(progress) !== JSON.stringify(DEFAULT_PROGRESS)
-    if (isNotDefault) {
-      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/save-state/${childID}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          level: LEVEL_NUMBER,
-          state: progress,
-        }),
-      }).catch((err) => console.error("Failed to save progress:", err))
-    }
+
+    const changed = JSON.stringify(progress) !== JSON.stringify(DEFAULT_PROGRESS)
+    if (!changed) return
+
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/save-state/${childID}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        level: LEVEL_NUMBER,
+        state: progress,
+      }),
+    }).catch((err) => console.error("Failed saving progress", err))
   }, [progress, childID, isLoading])
 
+  // Load profile
   useEffect(() => {
-    if (childID) {
-      fetch(`/api/child-profile/${childID}`)
-        .then((res) => res.json())
-        .then((data) => setChildProfile(data?.data || data))
-        .catch((err) => console.error("Failed to fetch profile:", err))
-    }
+    if (!childID) return
+
+    fetch(`/api/child-profile/${childID}`)
+      .then((res) => res.json())
+      .then((data) => setChildProfile(data?.data || data))
+      .catch(() => null)
   }, [childID])
 
+  // Handle game completion
   const handleGameComplete = async (
     gameNum: 1 | 2 | 3 | 4 | 5 | 6,
     score: number,
     total: number,
     gameTitle: string
   ) => {
-    const nextGame = gameNum < 6 ? (gameNum + 1) as (2 | 3 | 4 | 5 | 6) : null
+    const next = gameNum < 6 ? ((gameNum + 1) as 2 | 3 | 4 | 5 | 6) : null
 
     setProgress((prev) => ({
       ...prev,
       [`game${gameNum}Completed`]: true,
-      lastPlayedGame: nextGame,
-    } as unknown as GameProgress))
+      lastPlayedGame: next,
+    } as GameProgress))
 
     setLastGameScore({ score, total, gameTitle })
     setShowReward(true)
     setCurrentGame(null)
 
+    // Log score
     if (childID) {
       try {
         await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/log-game/${childID}`, {
@@ -175,9 +169,7 @@ useEffect(() => {
             completedAt: new Date().toISOString(),
           }),
         })
-      } catch (err) {
-        console.error("Failed to log game score:", err)
-      }
+      } catch {}
     }
 
     onProgressUpdated?.()
@@ -198,25 +190,16 @@ useEffect(() => {
     onProgressClick?.()
   }
 
-  // If playing a specific game
+  // Render active game
   if (currentGame) {
-    const gameProps = {
-      onBack: () => setCurrentGame(null),
-      onComplete: (score: number, total: number) =>
-        handleGameComplete(
-          currentGame,
-          score,
-          total,
-          [
-            "Social Detective",
-            "Conversation Builder",
-            "Role-Play Chat",
-            "Time Sequencing",
-            "Context Understanding",
-            "Perspective Taking",
-          ][currentGame - 1]
-        ),
-    }
+    const titles = [
+      "Social Detective",
+      "Conversation Builder",
+      "Role-Play Chat",
+      "Time Sequencing",
+      "Context Understanding",
+      "Perspective Taking",
+    ]
 
     const games = [
       GameSocialDetective,
@@ -226,9 +209,9 @@ useEffect(() => {
       GameContextUnderstanding,
       GamePerspectiveTaking,
     ]
+
     const GameComponent = games[currentGame - 1]
 
-    // notify parent about module change (so LearningPage can save lastModuleID)
     onModuleChange?.(currentGame)
 
     return (
@@ -244,19 +227,24 @@ useEffect(() => {
           backgroundPosition: "center",
         }}
       >
-        <GameComponent {...gameProps} />
+        <GameComponent
+          onBack={() => setCurrentGame(null)}
+          onComplete={(score, total) =>
+            handleGameComplete(currentGame, score, total, titles[currentGame - 1])
+          }
+        />
       </motion.div>
     )
   }
 
-  // Build the game nodes list (menu)
+  // Game nodes (menu)
   const gameNodes = [
     {
       id: 1,
       title: "Social Detective",
       icon: "🔍",
-      isCompleted: progress.game1Completed,
       isLocked: false,
+      isCompleted: progress.game1Completed,
       onClick: () => {
         setProgress((prev) => ({ ...prev, lastPlayedGame: 1 }))
         setCurrentGame(1)
@@ -266,65 +254,60 @@ useEffect(() => {
       id: 2,
       title: "Conversation Builder",
       icon: "💬",
-      isCompleted: progress.game2Completed,
       isLocked: !progress.game1Completed,
+      isCompleted: progress.game2Completed,
       onClick: () => {
-        if (progress.game1Completed) {
-          setProgress((prev) => ({ ...prev, lastPlayedGame: 2 }))
-          setCurrentGame(2)
-        }
+        if (!progress.game1Completed) return
+        setProgress((prev) => ({ ...prev, lastPlayedGame: 2 }))
+        setCurrentGame(2)
       },
     },
     {
       id: 3,
       title: "Role-Play Chat",
       icon: "🎭",
-      isCompleted: progress.game3Completed,
       isLocked: !progress.game2Completed,
+      isCompleted: progress.game3Completed,
       onClick: () => {
-        if (progress.game2Completed) {
-          setProgress((prev) => ({ ...prev, lastPlayedGame: 3 }))
-          setCurrentGame(3)
-        }
+        if (!progress.game2Completed) return
+        setProgress((prev) => ({ ...prev, lastPlayedGame: 3 }))
+        setCurrentGame(3)
       },
     },
     {
       id: 4,
       title: "Time Sequencing",
       icon: "⏰",
-      isCompleted: progress.game4Completed,
       isLocked: !progress.game3Completed,
+      isCompleted: progress.game4Completed,
       onClick: () => {
-        if (progress.game3Completed) {
-          setProgress((prev) => ({ ...prev, lastPlayedGame: 4 }))
-          setCurrentGame(4)
-        }
+        if (!progress.game3Completed) return
+        setProgress((prev) => ({ ...prev, lastPlayedGame: 4 }))
+        setCurrentGame(4)
       },
     },
     {
       id: 5,
       title: "Context Understanding",
       icon: "🛍️",
-      isCompleted: progress.game5Completed,
       isLocked: !progress.game4Completed,
+      isCompleted: progress.game5Completed,
       onClick: () => {
-        if (progress.game4Completed) {
-          setProgress((prev) => ({ ...prev, lastPlayedGame: 5 }))
-          setCurrentGame(5)
-        }
+        if (!progress.game4Completed) return
+        setProgress((prev) => ({ ...prev, lastPlayedGame: 5 }))
+        setCurrentGame(5)
       },
     },
     {
       id: 6,
       title: "Perspective Taking",
       icon: "🤔",
-      isCompleted: progress.game6Completed,
       isLocked: !progress.game5Completed,
+      isCompleted: progress.game6Completed,
       onClick: () => {
-        if (progress.game5Completed) {
-          setProgress((prev) => ({ ...prev, lastPlayedGame: 6 }))
-          setCurrentGame(6)
-        }
+        if (!progress.game5Completed) return
+        setProgress((prev) => ({ ...prev, lastPlayedGame: 6 }))
+        setCurrentGame(6)
       },
     },
   ]
@@ -345,11 +328,11 @@ useEffect(() => {
           "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/level1-XUUiuqLXdrFN3BtpvLSpLtUe5SsQZb.jpg')",
         backgroundSize: "140%",
         backgroundPosition: "center",
-        backgroundColor: "rgba(255, 255, 255, 0.3)",
+        backgroundColor: "rgba(255,255,255,0.3)",
         backgroundBlendMode: "lighten",
       }}
     >
-      {/* Animated floating elements */}
+      {/* ⭐ Floating Emojis ⭐ */}
       <div className="absolute inset-0 pointer-events-none">
         {[...Array(20)].map((_, i) => (
           <motion.div
@@ -371,43 +354,176 @@ useEffect(() => {
               delay: Math.random() * 5,
             }}
           >
-            {["🔍", "💬", "🎭", "⏰", "🛍️", "🤔", "⭐", "✨"][Math.floor(Math.random() * 8)]}
+            {["🔍", "💬", "🎭", "⏰", "🛍️", "🤔", "⭐", "✨"][i % 8]}
           </motion.div>
         ))}
       </div>
 
-      {/* Header and other UI (kept intentionally compact here for clarity) */}
-      <motion.div className="flex items-center justify-between mb-8 relative z-10" initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring" }}>
+      {/* ⭐ HEADER ⭐ */}
+      <motion.div
+        className="flex items-center justify-between mb-8 relative z-10"
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring" }}
+      >
         <div className="flex-1" />
-        <motion.h1 className="text-4xl font-black text-center">Level 1: Minimal Support</motion.h1>
-        <motion.button onClick={onProgressClick} className="p-3 rounded-xl bg-white">Progress</motion.button>
+
+        <motion.h1
+          className="text-5xl font-black bg-gradient-to-r from-green-500 via-blue-500 to-cyan-500 bg-clip-text text-transparent drop-shadow-2xl text-center"
+        >
+          <motion.span
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            Level 1: Minimal Support
+          </motion.span>
+          <motion.div
+            className="text-2xl mt-2"
+            animate={{ y: [0, -5, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            🌱✨
+          </motion.div>
+        </motion.h1>
+
+        {/* ⭐ PROGRESS BUTTON ⭐ */}
+        <motion.button
+          onClick={onProgressClick}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.95 }}
+          className="flex items-center gap-4 p-5 bg-white/95 backdrop-blur-lg rounded-full shadow-2xl hover:shadow-3xl transition-all cursor-pointer border-4 border-green-200 relative overflow-hidden group"
+        >
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-r from-green-100/50 to-blue-100/50"
+            animate={{
+              x: [-300, 300],
+              opacity: [0, 0.5, 0],
+            }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+
+          <div className="relative z-10">
+            <div className="flex items-center justify-between text-sm font-black text-gray-800 mb-2">
+              <span className="flex items-center gap-2">🎯 Progress</span>
+              <span className="text-green-600">{Math.round(totalProgress)}%</span>
+            </div>
+            <div className="w-36 h-4 bg-gray-200 rounded-full overflow-hidden shadow-inner border-2 border-gray-300">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${totalProgress}%` }}
+                transition={{ duration: 1 }}
+                className="h-full bg-gradient-to-r from-green-400 via-emerald-500 to-blue-500"
+              />
+            </div>
+          </div>
+        </motion.button>
       </motion.div>
 
-      {/* Fun Stats Bar */}
-      <motion.div className="flex justify-center gap-4 mb-8 relative z-10">
-        {/* stats... small simplified version */}
-        <div className="bg-gradient-to-br from-blue-400 to-cyan-400 p-4 rounded-2xl shadow-lg min-w-[100px] text-center">
-          <div className="text-2xl font-black text-white">{Math.round(totalProgress)}%</div>
-          <div className="text-xs font-bold text-white/90">Progress</div>
-        </div>
-      </motion.div>
+       {/* STATS BAR */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="flex justify-center gap-4 mb-8 relative z-10"
+            >
+              {[
+                { icon: "🎮", label: "Games", value: "6", color: "from-purple-400 to-pink-400" },
+                { icon: "⭐", label: "Completed", value: Object.values(progress).filter(Boolean).length.toString(), color: "from-yellow-400 to-orange-400" },
+                { icon: "🏆", label: "Remaining", value: (6 - Object.values(progress).filter(Boolean).length).toString(), color: "from-red-400 to-pink-400" },
+              ].map((stat, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: i * 0.1, type: "spring" }}
+                  whileHover={{ scale: 1.1, y: -5 }}
+                  className={`bg-gradient-to-br ${stat.color} p-4 rounded-2xl shadow-lg min-w-[100px] relative overflow-hidden`}
+                >
+                  <motion.div
+                    className="absolute inset-0 bg-white/20"
+                    animate={{ x: [-100, 200] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
+                  />
+                  <div className="relative z-10 text-center">
+                    <motion.div className="text-3xl mb-1">
+                      {stat.icon}
+                    </motion.div>
+                    <div className="text-2xl font-black text-white">{stat.value}</div>
+                    <div className="text-xs font-bold text-white/90">{stat.label}</div>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
 
-      {/* Game Path */}
+      {/* ⭐ GAME TREE ⭐ */}
       <GameTreePath games={gameNodes} />
 
-      {/* Level Complete with Celebration */}
+      {/* ⭐ LEVEL COMPLETE ⭐ */}
       <AnimatePresence>
         {allGamesCompleted && (
-          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={{ type: "spring" }} className="mt-16 text-center relative z-10">
-            <motion.button onClick={handleLevelComplete} className="bg-yellow-400 rounded-3xl p-6">LEVEL COMPLETE</motion.button>
+          <motion.div
+            initial={{ scale: 0, opacity: 0, y: 100 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 150 }}
+            className="mt-16 text-center relative z-10"
+          >
+            {[...Array(12)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-4xl"
+                style={{ left: "50%", top: "50%" }}
+                initial={{ scale: 0, x: 0, y: 0 }}
+                animate={{
+                  scale: [0, 1, 0],
+                  x: [0, (Math.random() - 0.5) * 400],
+                  y: [0, (Math.random() - 0.5) * 400],
+                  opacity: [0, 1, 0],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                }}
+              >
+                {["🎉", "⭐", "✨", "🌟"][i % 4]}
+              </motion.div>
+            ))}
+
+            <motion.button
+              onClick={handleLevelComplete}
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.95 }}
+              className="bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 rounded-3xl p-10 shadow-2xl inline-block"
+            >
+              🎉 LEVEL COMPLETE! 🎉
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Popups and Modals */}
-      <RewardPopup isOpen={showReward} score={lastGameScore.score} totalScenarios={lastGameScore.total} gameTitle={lastGameScore.gameTitle} onDecorate={() => { setShowReward(false); setShowCustomizer(true) }} onSkip={() => setShowReward(false)} />
+      {/* ⭐ MODALS ⭐ */}
+      <RewardPopup
+        isOpen={showReward}
+        score={lastGameScore.score}
+        totalScenarios={lastGameScore.total}
+        gameTitle={lastGameScore.gameTitle}
+        onDecorate={() => {
+          setShowReward(false)
+          setShowCustomizer(true)
+        }}
+        onSkip={() => setShowReward(false)}
+      />
+
       <AvatarCustomizer isOpen={showCustomizer} childID={childID} onSave={handleAvatarSaved} />
-      <LevelCompletionCelebration isOpen={showCelebration} levelNumber={1} avatarConfig={childProfile?.avatarConfig || {}} childID={childID} onNavigateToMap={handleNavigateBack} />
+
+      <LevelCompletionCelebration
+        isOpen={showCelebration}
+        levelNumber={1}
+        avatarConfig={childProfile?.avatarConfig || {}}
+        childID={childID}
+        onNavigateToMap={handleNavigateBack}
+      />
     </div>
   )
 }
