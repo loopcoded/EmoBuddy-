@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import GameSocialDetective from "./games/game-social-detective"
 import GameConversationBuilder from "./games/game-conversation-builder"
 import GameRolePlayChatbot from "./games/game-role-play-chatbot"
@@ -31,86 +31,109 @@ const DEFAULT_PROGRESS: GameProgress = {
   game5Completed: false,
   game6Completed: false,
   lastPlayedGame: null,
-};
+}
 
-const LEVEL_NUMBER = 1;
+const LEVEL_NUMBER = 1
 
 interface Level1JourneyProps {
   childID?: string
   onProgressClick?: () => void
   initialProgress?: GameProgress
-  onProgressUpdated?: () => void;
+  onProgressUpdated?: () => void
+  onModuleChange?: (moduleId: number) => void
 }
 
+export default function Level1Journey(props: Level1JourneyProps) {
+  const { childID, onProgressClick, initialProgress, onProgressUpdated, onModuleChange } = props
 
-export default function Level1Journey({ childID, onProgressClick, initialProgress, onProgressUpdated }: Level1JourneyProps = {}) {
   const [currentGame, setCurrentGame] = useState<1 | 2 | 3 | 4 | 5 | 6 | null>(null)
-  const [progress, setProgress] = useState<GameProgress>(initialProgress || DEFAULT_PROGRESS);
+  const [progress, setProgress] = useState<GameProgress>(initialProgress || DEFAULT_PROGRESS)
   const [totalProgress, setTotalProgress] = useState(0)
   const [showReward, setShowReward] = useState(false)
   const [showCustomizer, setShowCustomizer] = useState(false)
   const [lastGameScore, setLastGameScore] = useState({ score: 0, total: 0, gameTitle: "" })
   const [showCelebration, setShowCelebration] = useState(false)
   const [childProfile, setChildProfile] = useState<{ avatarConfig: Record<string, unknown> } | null>(null)
-  const [isLoading, setIsLoading] = useState(true); // ✅ Added loading state
+  const [isLoading, setIsLoading] = useState(true)
 
-  // ✅ CHANGED: Load progress from DATABASE instead of localStorage
+  // Calculate total progress
+  useEffect(() => {
+    const completed = [
+      progress.game1Completed,
+      progress.game2Completed,
+      progress.game3Completed,
+      progress.game4Completed,
+      progress.game5Completed,
+      progress.game6Completed,
+    ].filter(Boolean).length
+    setTotalProgress((completed / 6) * 100)
+  }, [progress])
+
   useEffect(() => {
     if (childID) {
-      setIsLoading(true);
+      setIsLoading(true)
       fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/get-state/${childID}/${LEVEL_NUMBER}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.state) {
-            const parsed = data.state as GameProgress;
-            setProgress(parsed);
-            // ✅ Resume logic: if lastPlayedGame is set and that game is not complete, resume it
-            const last = parsed.lastPlayedGame;
-            if (last) {
-              const isCompleted =
-                last === 1 ? parsed.game1Completed
-                : last === 2 ? parsed.game2Completed
-                : last === 3 ? parsed.game3Completed
-                : last === 4 ? parsed.game4Completed
-                : last === 5 ? parsed.game5Completed
-                : last === 6 ? parsed.game6Completed
-                : true;
-              if (!isCompleted) {
-                setCurrentGame(last as 1 | 2 | 3 | 4 | 5 | 6);
-              }
+            const parsed = data.state as GameProgress
+            setProgress(parsed)
+            const last = parsed.lastPlayedGame
+            if (last && !(parsed as any)[`game${last}Completed`]) {
+              setCurrentGame(last as 1 | 2 | 3 | 4 | 5 | 6)
             }
           } else {
-            // No progress saved yet, use default
-            setProgress(DEFAULT_PROGRESS);
+            setProgress(DEFAULT_PROGRESS)
           }
         })
         .catch((err) => {
-          console.error("Failed to fetch progress:", err);
-          setProgress(DEFAULT_PROGRESS);
+          console.error("Failed to fetch progress:", err)
+          setProgress(DEFAULT_PROGRESS)
         })
-        .finally(() => setIsLoading(false));
+        .finally(() => setIsLoading(false))
     }
-  }, [childID]);
-
-  // ✅ CHANGED: Save progress to DATABASE instead of localStorage
+  }, [childID])
+  
+  // Auto-resume last game after calming
+  // Auto-resume last game after calming (paste into level1/2/3 journey components)
 useEffect(() => {
-  if (!childID || isLoading) return;
+  if (typeof window === "undefined") return;
 
-  const isNotDefault = JSON.stringify(progress) !== JSON.stringify(DEFAULT_PROGRESS);
-  if (isNotDefault) {
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/save-state/${childID}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        level: LEVEL_NUMBER,
-        state: progress,
-      }),
-    }).catch(err => console.error("Failed to save progress:", err));
+  const hash = window.location.hash;
+  if (!hash || !hash.startsWith("#module-")) return;
+
+  const moduleIdRaw = hash.replace("#module-", "");
+  const moduleId = Number(moduleIdRaw);
+
+  // Validate moduleId is an integer between 1 and 6
+  if (!Number.isInteger(moduleId) || moduleId < 1 || moduleId > 6) {
+    // invalid or out-of-range id — ignore
+    return;
   }
-}, [progress, childID, isLoading]);
 
+  // TypeScript: cast to the union type that setCurrentGame expects
+  setCurrentGame(moduleId as 1 | 2 | 3 | 4 | 5 | 6);
 
-  // ✅ Fetch child profile for avatar config (No changes)
+  // Clear the hash so it doesn't trigger again on refresh/navigation
+  window.location.hash = "";
+}, []);
+
+  
+  useEffect(() => {
+    if (!childID || isLoading) return
+    const isNotDefault = JSON.stringify(progress) !== JSON.stringify(DEFAULT_PROGRESS)
+    if (isNotDefault) {
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/save-state/${childID}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          level: LEVEL_NUMBER,
+          state: progress,
+        }),
+      }).catch((err) => console.error("Failed to save progress:", err))
+    }
+  }, [progress, childID, isLoading])
+
   useEffect(() => {
     if (childID) {
       fetch(`/api/child-profile/${childID}`)
@@ -118,54 +141,47 @@ useEffect(() => {
         .then((data) => setChildProfile(data?.data || data))
         .catch((err) => console.error("Failed to fetch profile:", err))
     }
-  }, [childID]);
+  }, [childID])
 
-  // ✅ Handle game completion
-const handleGameComplete = async (
-  gameNum: 1 | 2 | 3 | 4 | 5 | 6,
-  score: number,
-  total: number,
-  gameTitle: string
-) => {
-  const nextGame = gameNum < 6 ? (gameNum + 1) as (2 | 3 | 4 | 5 | 6) : null;
+  const handleGameComplete = async (
+    gameNum: 1 | 2 | 3 | 4 | 5 | 6,
+    score: number,
+    total: number,
+    gameTitle: string
+  ) => {
+    const nextGame = gameNum < 6 ? (gameNum + 1) as (2 | 3 | 4 | 5 | 6) : null
 
-  // ✅ Update local progress (triggers save to DB)
-  setProgress((prev) => ({
-    ...prev,
-    [`game${gameNum}Completed`]: true,
-    lastPlayedGame: nextGame,
-  }));
+    setProgress((prev) => ({
+      ...prev,
+      [`game${gameNum}Completed`]: true,
+      lastPlayedGame: nextGame,
+    } as unknown as GameProgress))
 
-  setLastGameScore({ score, total, gameTitle });
-  setShowReward(true);
-  setCurrentGame(null);
+    setLastGameScore({ score, total, gameTitle })
+    setShowReward(true)
+    setCurrentGame(null)
 
-  // ✅ Send game completion to backend
-  if (childID) {
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/log-game/${childID}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          level: LEVEL_NUMBER,
-          gameId: gameNum,
-          gameTitle,
-          score,
-          total,
-          completedAt: new Date().toISOString(),
-        }),
-      });
-    } catch (err) {
-      console.error("Failed to log game score:", err);
+    if (childID) {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/progress/log-game/${childID}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            level: LEVEL_NUMBER,
+            gameId: gameNum,
+            gameTitle,
+            score,
+            total,
+            completedAt: new Date().toISOString(),
+          }),
+        })
+      } catch (err) {
+        console.error("Failed to log game score:", err)
+      }
     }
-  }
 
-  // ✅ Auto-refresh the parent progress bar after save
-  if (onProgressUpdated) {
-    onProgressUpdated(); // 🚀 calls parent’s fetchProgress() in LearningJourneyPage
+    onProgressUpdated?.()
   }
-};
-
 
   const handleAvatarSaved = () => {
     setShowCustomizer(false)
@@ -182,7 +198,7 @@ const handleGameComplete = async (
     onProgressClick?.()
   }
 
-  // ✅ Dynamic Game Rendering
+  // If playing a specific game
   if (currentGame) {
     const gameProps = {
       onBack: () => setCurrentGame(null),
@@ -211,29 +227,30 @@ const handleGameComplete = async (
       GamePerspectiveTaking,
     ]
     const GameComponent = games[currentGame - 1]
+
+    // notify parent about module change (so LearningPage can save lastModuleID)
+    onModuleChange?.(currentGame)
+
     return (
-      <div
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         className="min-h-screen bg-cover bg-center"
         style={{
-          backgroundImage: `url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/level1-XUUiuqLXdrFN3BtpvLSpLtUe5SsQZb.jpg')`,
+          backgroundImage:
+            "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/level1-XUUiuqLXdrFN3BtpvLSpLtUe5SsQZb.jpg')",
           backgroundSize: "140%",
           backgroundPosition: "center",
         }}
       >
         <GameComponent {...gameProps} />
-      </div>
+      </motion.div>
     )
   }
 
-  // ✅ Game Map Nodes
-  const gameNodes: Array<{
-    id: number
-    title: string
-    icon: string
-    isCompleted: boolean
-    isLocked: boolean
-    onClick: () => void
-  }> = [
+  // Build the game nodes list (menu)
+  const gameNodes = [
     {
       id: 1,
       title: "Social Detective",
@@ -287,7 +304,7 @@ const handleGameComplete = async (
     {
       id: 5,
       title: "Context Understanding",
-      icon: "🏛️",
+      icon: "🛍️",
       isCompleted: progress.game5Completed,
       isLocked: !progress.game4Completed,
       onClick: () => {
@@ -312,94 +329,85 @@ const handleGameComplete = async (
     },
   ]
 
+  const allGamesCompleted =
+    progress.game1Completed &&
+    progress.game2Completed &&
+    progress.game3Completed &&
+    progress.game4Completed &&
+    progress.game5Completed &&
+    progress.game6Completed
+
   return (
     <div
-      className="min-h-screen bg-cover bg-center p-6"
+      className="min-h-screen bg-cover bg-center p-6 relative overflow-hidden"
       style={{
-        backgroundImage: `url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/level1-XUUiuqLXdrFN3BtpvLSpLtUe5SsQZb.jpg')`,
+        backgroundImage:
+          "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/level1-XUUiuqLXdrFN3BtpvLSpLtUe5SsQZb.jpg')",
         backgroundSize: "140%",
         backgroundPosition: "center",
         backgroundColor: "rgba(255, 255, 255, 0.3)",
         backgroundBlendMode: "lighten",
       }}
     >
-      {/* Header with progress bar */}
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 drop-shadow-lg flex-1 text-center">
-          Level 1: Minimal Support
-        </h1>
-        <motion.button
-          onClick={onProgressClick}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="flex items-center gap-4 p-4 bg-white/90 rounded-full shadow-lg hover:bg-white transition-all cursor-pointer"
-        >
-          <div>
-            <div className="flex items-center justify-between text-sm font-semibold text-gray-700 mb-1">
-              <span>Progress</span>
-              <span>{Math.round(totalProgress)}%</span>
-            </div>
-            <div className="w-32 h-3 bg-gray-200 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${totalProgress}%` }}
-                transition={{ duration: 0.5 }}
-                className="h-full bg-gradient-to-r from-green-400 to-blue-500"
-              />
-            </div>
-          </div>
-        </motion.button>
+      {/* Animated floating elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-4xl"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              y: [0, -30, 0],
+              x: [0, Math.random() * 20 - 10, 0],
+              opacity: [0.2, 0.5, 0.2],
+              rotate: [0, 360],
+            }}
+            transition={{
+              duration: Math.random() * 10 + 10,
+              repeat: Infinity,
+              delay: Math.random() * 5,
+            }}
+          >
+            {["🔍", "💬", "🎭", "⏰", "🛍️", "🤔", "⭐", "✨"][Math.floor(Math.random() * 8)]}
+          </motion.div>
+        ))}
       </div>
+
+      {/* Header and other UI (kept intentionally compact here for clarity) */}
+      <motion.div className="flex items-center justify-between mb-8 relative z-10" initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring" }}>
+        <div className="flex-1" />
+        <motion.h1 className="text-4xl font-black text-center">Level 1: Minimal Support</motion.h1>
+        <motion.button onClick={onProgressClick} className="p-3 rounded-xl bg-white">Progress</motion.button>
+      </motion.div>
+
+      {/* Fun Stats Bar */}
+      <motion.div className="flex justify-center gap-4 mb-8 relative z-10">
+        {/* stats... small simplified version */}
+        <div className="bg-gradient-to-br from-blue-400 to-cyan-400 p-4 rounded-2xl shadow-lg min-w-[100px] text-center">
+          <div className="text-2xl font-black text-white">{Math.round(totalProgress)}%</div>
+          <div className="text-xs font-bold text-white/90">Progress</div>
+        </div>
+      </motion.div>
 
       {/* Game Path */}
       <GameTreePath games={gameNodes} />
 
-      {/* Level Complete */}
-      {progress.game1Completed &&
-        progress.game2Completed &&
-        progress.game3Completed &&
-        progress.game4Completed &&
-        progress.game5Completed &&
-        progress.game6Completed && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="mt-16 text-center"
-          >
-            <motion.button
-              onClick={handleLevelComplete}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-gradient-to-r from-yellow-300 to-orange-400 rounded-3xl p-8 shadow-2xl inline-block hover:shadow-3xl transition-all cursor-pointer"
-            >
-              <p className="text-4xl font-bold text-white drop-shadow-lg">🎉 Level Complete! 🎉</p>
-              <p className="text-xl text-white mt-2 drop-shadow-lg">Click to see your rewards</p>
-            </motion.button>
+      {/* Level Complete with Celebration */}
+      <AnimatePresence>
+        {allGamesCompleted && (
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={{ type: "spring" }} className="mt-16 text-center relative z-10">
+            <motion.button onClick={handleLevelComplete} className="bg-yellow-400 rounded-3xl p-6">LEVEL COMPLETE</motion.button>
           </motion.div>
         )}
+      </AnimatePresence>
 
-      {/* Popups */}
-      <RewardPopup
-        isOpen={showReward}
-        score={lastGameScore.score}
-        totalScenarios={lastGameScore.total}
-        gameTitle={lastGameScore.gameTitle}
-        onDecorate={() => {
-          setShowReward(false)
-          setShowCustomizer(true)
-        }}
-        onSkip={() => setShowReward(false)}
-      />
-
+      {/* Popups and Modals */}
+      <RewardPopup isOpen={showReward} score={lastGameScore.score} totalScenarios={lastGameScore.total} gameTitle={lastGameScore.gameTitle} onDecorate={() => { setShowReward(false); setShowCustomizer(true) }} onSkip={() => setShowReward(false)} />
       <AvatarCustomizer isOpen={showCustomizer} childID={childID} onSave={handleAvatarSaved} />
-
-      <LevelCompletionCelebration
-        isOpen={showCelebration}
-        levelNumber={1}
-        avatarConfig={childProfile?.avatarConfig || {}}
-        childID={childID}
-        onNavigateToMap={handleNavigateBack}
-      />
+      <LevelCompletionCelebration isOpen={showCelebration} levelNumber={1} avatarConfig={childProfile?.avatarConfig || {}} childID={childID} onNavigateToMap={handleNavigateBack} />
     </div>
   )
 }
