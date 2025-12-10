@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { motion } from "framer-motion"
+import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
 
 interface GameProps {
-  onComplete: (score: number, total: number) => void
-  onBack: () => void
+  onComplete: (score: number, total: number) => void;
+  onBack: () => void;
 }
 
 const emotions = [
@@ -17,46 +17,81 @@ const emotions = [
   { emotion: "Sad", emoji: "😢", description: "Unhappy, upset" },
   { emotion: "Relaxed", emoji: "😌", description: "Calm and peaceful" },
   { emotion: "Scared", emoji: "😨", description: "Afraid, frightened" },
-]
+];
 
 export default function GameFacialBodyLanguage({ onComplete, onBack }: GameProps) {
-  const [currentEmotionIndex, setCurrentEmotionIndex] = useState(0)
-  const [score, setScore] = useState(0)
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
-  const [isAnswered, setIsAnswered] = useState(false)
-  const [allComplete, setAllComplete] = useState(false)
+  const [currentEmotionIndex, setCurrentEmotionIndex] = useState(0);
+  const [score, setScore] = useState(0);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [allComplete, setAllComplete] = useState(false);
 
-  const currentEmotion = emotions[currentEmotionIndex]
-  const otherEmotions = emotions
-    .filter((_, i) => i !== currentEmotionIndex)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3)
-  const options = [currentEmotion, ...otherEmotions].sort(() => Math.random() - 0.5)
+  const currentEmotion = emotions[currentEmotionIndex];
 
-  const handleAnswerClick = (selected: typeof currentEmotion) => {
-    if (isAnswered) return
-    const isCorrect = selected.emotion === currentEmotion.emotion
-    setSelectedAnswer(options.indexOf(selected))
-    setIsAnswered(true)
+  // FIXED: Options stay FIXED for each question
+  const options = useMemo(() => {
+    const others = emotions
+      .filter((_, idx) => idx !== currentEmotionIndex)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
 
-    if (isCorrect) {
-      setScore(score + 1)
+    return [...others, currentEmotion].sort(() => Math.random() - 0.5);
+  }, [currentEmotionIndex]);
+
+  const handleAnswerClick = (selectedIndex: number) => {
+    if (isAnswered) return;
+
+    setSelectedOptionIndex(selectedIndex);
+    setIsAnswered(true);
+
+    const selectedEmotion = options[selectedIndex];
+
+    if (selectedEmotion.emotion === currentEmotion.emotion) {
+      setScore((prev) => prev + 1);
     }
-  }
+  };
 
   const handleNext = () => {
     if (currentEmotionIndex < emotions.length - 1) {
-      setCurrentEmotionIndex(currentEmotionIndex + 1)
-      setSelectedAnswer(null)
-      setIsAnswered(false)
+      setCurrentEmotionIndex((prev) => prev + 1);
+      setSelectedOptionIndex(null);
+      setIsAnswered(false);
     } else {
-      setAllComplete(true)
+      setAllComplete(true);
     }
+  };
+
+  if (allComplete) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="bg-white shadow-2xl rounded-3xl p-12 text-center max-w-lg"
+        >
+          <div className="text-8xl mb-6 animate-bounce">🎉</div>
+          <h2 className="text-3xl font-bold text-indigo-600 mb-4">Emotion Expert!</h2>
+          <p className="text-xl text-gray-700 mb-2">
+            You scored {score}/{emotions.length}
+          </p>
+          <p className="text-gray-600 mb-8">
+            You recognized all the facial & body expressions!
+          </p>
+          <button
+            onClick={() => onComplete(score, emotions.length)}
+            className="px-6 py-3 w-full bg-gradient-to-r from-indigo-400 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg text-lg"
+          >
+            Return to Journey
+          </button>
+        </motion.div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full">
+        
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <button
@@ -65,13 +100,17 @@ export default function GameFacialBodyLanguage({ onComplete, onBack }: GameProps
           >
             ← Back
           </button>
-          <h2 className="text-2xl font-bold text-center text-indigo-600">Facial & Body Language</h2>
-          <div className="text-2xl">
+
+          <h2 className="text-2xl font-bold text-indigo-600">
+            Facial & Body Language
+          </h2>
+
+          <div className="text-2xl font-bold text-indigo-600">
             😊 {score}/{emotions.length}
           </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress */}
         <div className="w-full bg-gray-200 rounded-full h-2 mb-8">
           <motion.div
             initial={{ width: 0 }}
@@ -80,100 +119,95 @@ export default function GameFacialBodyLanguage({ onComplete, onBack }: GameProps
           />
         </div>
 
-        {!allComplete ? (
-          <>
-            {/* Emotion display */}
-            <div className="bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-2xl p-8 mb-8 text-center">
-              <p className="text-lg font-semibold text-indigo-700 mb-4">How is this person feeling?</p>
-              <div className="text-9xl mb-4 animate-bounce">{currentEmotion.emoji}</div>
-              <p className="text-gray-600 italic">{currentEmotion.description}</p>
-            </div>
+        {/* Emotion Card */}
+        <div className="bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-2xl p-8 mb-8 text-center">
+          <p className="text-lg font-semibold text-indigo-700 mb-4">How is this person feeling?</p>
+          <div className="text-9xl mb-4 animate-bounce">{currentEmotion.emoji}</div>
+          <p className="text-gray-600 italic">{currentEmotion.description}</p>
+        </div>
 
-            {/* Emotion options */}
-            <p className="text-lg font-bold text-center mb-4 text-gray-800">Choose the emotion:</p>
-            <div className="grid grid-cols-2 gap-3 mb-8">
-              {options.map((option, index) => (
-                <motion.button
-                  key={index}
-                  whileHover={!isAnswered ? { scale: 1.05 } : {}}
-                  onClick={() => handleAnswerClick(option)}
-                  disabled={isAnswered}
-                  className={`p-4 rounded-xl font-bold transition-all ${
-                    !isAnswered
-                      ? "bg-gradient-to-r from-indigo-400 to-indigo-500 text-white hover:shadow-lg cursor-pointer"
-                      : selectedAnswer === index
-                        ? option.emotion === currentEmotion.emotion
-                          ? "bg-gradient-to-r from-green-400 to-green-500 text-white ring-4 ring-green-300"
-                          : "bg-gradient-to-r from-red-400 to-red-500 text-white ring-4 ring-red-300"
-                        : "bg-gray-200 text-gray-500"
-                  }`}
-                >
-                  <div className="text-3xl mb-1">{option.emoji}</div>
-                  <div className="text-sm">{option.emotion}</div>
-                </motion.button>
-              ))}
-            </div>
+        <p className="text-lg font-bold text-center mb-4 text-gray-800">Choose the emotion:</p>
 
-            {/* Feedback */}
-            {isAnswered && (
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className={`text-center p-4 rounded-xl mb-6 text-lg font-bold ${
-                  options[selectedAnswer!].emotion === currentEmotion.emotion
-                    ? "bg-gradient-to-r from-green-200 to-green-100 text-green-800"
-                    : "bg-gradient-to-r from-yellow-200 to-yellow-100 text-yellow-800"
-                }`}
+        {/* Answer Options */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          {options.map((opt, idx) => {
+            const correct = opt.emotion === currentEmotion.emotion;
+            const selected = selectedOptionIndex === idx;
+
+            let className =
+              "p-4 rounded-xl text-center font-bold transition-all cursor-pointer";
+
+            if (!isAnswered) {
+              className +=
+                " bg-gradient-to-r from-indigo-400 to-indigo-500 text-white hover:shadow-lg";
+            } else {
+              if (selected && correct)
+                className +=
+                  " bg-gradient-to-r from-green-400 to-green-500 text-white ring-4 ring-green-300";
+              else if (selected && !correct)
+                className +=
+                  " bg-gradient-to-r from-red-400 to-red-500 text-white ring-4 ring-red-300";
+              else className += " bg-gray-200 text-gray-500";
+            }
+
+            return (
+              <motion.button
+                key={idx}
+                whileHover={!isAnswered ? { scale: 1.05 } : {}}
+                className={className}
+                disabled={isAnswered}
+                onClick={() => handleAnswerClick(idx)}
               >
-                {options[selectedAnswer!].emotion === currentEmotion.emotion
-                  ? `✅ Right! That's ${currentEmotion.emotion}!`
-                  : `Try again! This is ${currentEmotion.emotion}.`}
-              </motion.div>
-            )}
+                <div className="text-3xl mb-1">{opt.emoji}</div>
+                <div className="text-sm">{opt.emotion}</div>
+              </motion.button>
+            );
+          })}
+        </div>
 
-            {/* Next button */}
-            {isAnswered && options[selectedAnswer!].emotion !== currentEmotion.emotion ? (
-              <button
-                onClick={() => {
-                  setSelectedAnswer(null)
-                  setIsAnswered(false)
-                }}
-                className="w-full py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-bold rounded-xl hover:shadow-lg transition-all text-lg"
-              >
-                Try Again
-              </button>
-            ) : null}
-
-            {isAnswered && options[selectedAnswer!].emotion === currentEmotion.emotion && (
-              <button
-                onClick={handleNext}
-                className="w-full py-3 bg-gradient-to-r from-green-400 to-green-500 text-white font-bold rounded-xl hover:shadow-lg transition-all text-lg"
-              >
-                {currentEmotionIndex < emotions.length - 1 ? "Next Emotion →" : "Finish Game"}
-              </button>
-            )}
-          </>
-        ) : (
+        {/* Feedback */}
+        {isAnswered && (
           <motion.div
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-center py-8"
+            className={`text-center p-4 rounded-xl mb-6 font-bold text-lg ${
+              options[selectedOptionIndex!].emotion === currentEmotion.emotion
+                ? "bg-green-100 text-green-700"
+                : "bg-yellow-100 text-yellow-700"
+            }`}
           >
-            <div className="text-8xl mb-4 animate-bounce">🎉</div>
-            <p className="text-3xl font-bold text-indigo-600 mb-2">Emotion Expert!</p>
-            <p className="text-xl text-gray-700 mb-2">
-              You scored: {score}/{emotions.length}
-            </p>
-            <p className="text-lg text-gray-600 mb-6">You can recognize all these emotions!</p>
-            <button
-              onClick={() => onComplete(8, 8)}
-              className="w-full py-3 bg-gradient-to-r from-indigo-400 to-indigo-600 text-white font-bold rounded-xl hover:shadow-lg transition-all text-lg"
-            >
-              Return to Journey
-            </button>
+            {options[selectedOptionIndex!].emotion === currentEmotion.emotion
+              ? `✅ Correct! They feel ${currentEmotion.emotion}.`
+              : `❌ Not quite. This is actually ${currentEmotion.emotion}.`}
           </motion.div>
+        )}
+
+        {/* Buttons */}
+        {isAnswered && (
+          <>
+            {options[selectedOptionIndex!].emotion !== currentEmotion.emotion ? (
+              <button
+                onClick={() => {
+                  setSelectedOptionIndex(null);
+                  setIsAnswered(false);
+                }}
+                className="w-full py-3 bg-yellow-500 text-white rounded-xl font-bold hover:shadow-lg text-lg"
+              >
+                Try Again
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                className="w-full py-3 bg-green-500 text-white rounded-xl font-bold hover:shadow-lg text-lg"
+              >
+                {currentEmotionIndex < emotions.length - 1
+                  ? "Next Emotion →"
+                  : "Finish Game"}
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
-  )
+  );
 }

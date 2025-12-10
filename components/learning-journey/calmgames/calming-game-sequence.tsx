@@ -31,7 +31,7 @@ export function CalmingGameSequence({ onComplete, onBackToWelcome }: CalmingGame
     if (stage === "activation-popup") {
       const timer = setTimeout(() => {
         setStage("breathing")
-      }, 2000)
+      }, 5000)
       return () => clearTimeout(timer)
     }
   }, [stage])
@@ -42,7 +42,7 @@ export function CalmingGameSequence({ onComplete, onBackToWelcome }: CalmingGame
         if (stage === "transition-bubbles") setStage("bubbles")
         else if (stage === "transition-sounds") setStage("sounds")
         else if (stage === "transition-animals") setStage("animals")
-      }, 2000)
+      }, 5000)
       return () => clearTimeout(timer)
     }
   }, [stage])
@@ -85,7 +85,7 @@ export function CalmingGameSequence({ onComplete, onBackToWelcome }: CalmingGame
       )}
 
       {stage === "breathing" && (
-        <BreathingBalloon onComplete={handleBreathingComplete} durationSeconds={30} />
+        <BreathingBalloon onComplete={handleBreathingComplete} durationSeconds={10} />
       )}
 
       {stage === "transition-bubbles" && (

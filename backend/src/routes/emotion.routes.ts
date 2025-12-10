@@ -1,9 +1,14 @@
-import { Router } from "express"
-import { saveEmotion } from "../controllers/emotion.controller.js"
+// backend/src/routes/emotion.routes.ts
+import { Router } from "express";
+import { detectEmotionController } from "../controllers/emotion.controller.js";
 
-const router = Router()
+const router = Router();
 
-// ✅ POST /api/save-emotion
-router.post("/save-emotion", saveEmotion)
+console.log("🎭 Registering emotion routes...");
 
-export default router
+// This will be mounted at /api, so full path is /api/emotion/detect
+router.post("/emotion/detect", detectEmotionController);
+
+console.log("✅ Emotion route registered: POST /emotion/detect");
+
+export default router;

@@ -1,10 +1,10 @@
 {
-  "name": "EMOBUDDY",
+  "name": "emobuddy-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "NEXT_DISABLE_TURBOPACK=1 next dev",
     "lint": "eslint .",
     "start": "next start"
   },
